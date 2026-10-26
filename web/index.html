@@ -39,6 +39,17 @@
     <!-- Step 2: one-time certificate trust -->
     <section class="card" id="view-trust" hidden>
       <h2>Let this browser talk to your TV</h2>
+
+      <div class="warn" id="lna-denied" hidden>
+        <p><strong>This browser is blocking this site from reaching devices on your home network.</strong></p>
+        <p>Tap the icon to the left of the address bar &rarr; <strong>Permissions</strong> (or <strong>Site settings</strong>) &rarr; <strong>Local network access</strong> &rarr; <strong>Allow</strong>. Then tap Retry.</p>
+        <p>On Android, also check Settings &rarr; Apps &rarr; Chrome &rarr; Permissions &rarr; <strong>Nearby devices</strong> is allowed.</p>
+      </div>
+      <div id="lna-prompt" hidden>
+        <p>First, let this site reach your TV. Your browser will ask; choose <strong>Allow</strong>.</p>
+        <button class="primary" id="btn-lna">Allow access to my TV</button>
+      </div>
+
       <p>Your TV uses a security certificate that browsers don't recognize. You only need to approve it once:</p>
       <ol>
         <li>Tap <strong>Open TV link</strong>. A warning page opens in a new tab.</li>
@@ -47,8 +58,10 @@
       </ol>
       <div class="row">
         <a class="button primary" id="trust-link" target="_blank" rel="noopener">Open TV link</a>
+        <button id="btn-copy-link">Copy link</button>
         <button id="btn-retry">Retry</button>
       </div>
+      <p class="hint">If <strong>Open TV link</strong> says "This site can't be reached", tap <strong>Copy link</strong>, paste it into the address bar of a new tab yourself, and continue from step 2.</p>
       <p class="hint">If your browser asks to <em>access devices on your local network</em>, choose Allow.</p>
       <p class="hint"><strong>"This site can't be reached"?</strong> Then this device can't see the TV at all. Check that the TV is on, that this device is on the same Wi-Fi as the TV (not mobile data or a guest network), and that any VPN is off. On iPhone, also check Settings &rarr; your browser &rarr; <em>Local Network</em> is on. On Android, check Settings &rarr; Apps &rarr; your browser &rarr; Permissions &rarr; <em>Nearby devices</em> (or <em>Local network</em>) is allowed.</p>
       <button class="link" id="btn-change-ip">Use a different IP address</button>

@@ -121,6 +121,7 @@ async function request(method, path, body, { ip = tv.ip, port = tv.port, timeout
     if (tv.token) headers.AUTH = tv.token;
     const res = await fetch(`${apiBase(ip, port)}${path}`, {
       method, headers, cache: 'no-store', signal: ctrl.signal,
+      targetAddressSpace: 'local', // Chrome's Local Network Access: ask for permission instead of failing silently
       body: body ? JSON.stringify(body) : undefined,
     });
     const text = await res.text();
@@ -172,11 +173,49 @@ async function connect(ip) {
   showTrust();
 }
 
-function showTrust(message) {
+// Chrome 141+ gates requests from websites to 192.168.x.x behind a "local network access" permission.
+// Returns 'granted' | 'prompt' | 'denied', or null where the browser has no such permission.
+async function localNetworkState() {
+  if (!navigator.permissions) return null;
+  for (const name of ['local-network-access', 'local-network']) {
+    try {
+      const status = await navigator.permissions.query({ name });
+      status.onchange = () => { if (status.state === 'granted' && !ready) connect(tv.ip); };
+      return status.state;
+    } catch { /* not this name, or not supported */ }
+  }
+  return null;
+}
+
+const trustUrl = () => `https://${tv.ip}:${tv.port || PORTS[0]}/state/device/power_mode`;
+
+async function showTrust(message) {
   ready = false;
-  $('trust-link').href = `https://${tv.ip}:${tv.port || PORTS[0]}/state/device/power_mode`;
+  $('trust-link').href = trustUrl();
   setStatus('trust-status', message || '', message ? 'error' : '');
+  const lna = await localNetworkState();
+  $('lna-denied').hidden = lna !== 'denied';
+  $('lna-prompt').hidden = lna !== 'prompt';
   show('view-trust');
+}
+
+// Any request to the TV, made from a tap, makes Chrome show its local network prompt.
+async function requestLocalNetwork() {
+  setStatus('trust-status', 'Waiting for your browser…');
+  try {
+    await request('GET', '/state/device/power_mode', null, { timeout: 60000 });
+    return connect(tv.ip); // allowed, and the certificate is already trusted
+  } catch { /* allowed but the certificate isn't trusted yet, or the user said no */ }
+  showTrust();
+}
+
+async function copyTrustLink() {
+  try {
+    await navigator.clipboard.writeText(trustUrl());
+    toast('Link copied. Paste it into the address bar of a new tab.');
+  } catch {
+    prompt('Copy this link and paste it into the address bar of a new tab:', trustUrl());
+  }
 }
 
 function needPairing() {
@@ -769,6 +808,8 @@ $('btn-connect').onclick = () => {
 };
 $('ip').onkeydown = e => { if (e.key === 'Enter') $('btn-connect').click(); };
 $('btn-retry').onclick = () => connect(tv.ip);
+$('btn-lna').onclick = requestLocalNetwork;
+$('btn-copy-link').onclick = copyTrustLink;
 $('btn-change-ip').onclick = () => { $('ip').value = tv.ip || ''; show('view-connect'); };
 $('btn-pair-start').onclick = pairStart;
 $('btn-pair-finish').onclick = pairFinish;
