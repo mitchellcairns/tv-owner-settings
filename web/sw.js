@@ -1,6 +1,6 @@
 // Caches the app shell so the page opens offline. Requests to the TV are never intercepted.
-const CACHE = 'tv-owner-settings-v2';
-const SHELL = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
+const CACHE = 'tv-owner-settings-v3';
+const SHELL = ['./', 'index.html', 'app.js', 'style.css', 'apps.json', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));

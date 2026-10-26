@@ -141,6 +141,16 @@ button:disabled, select:disabled, input:disabled { opacity: .45; cursor: not-all
 .media { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .media .key { min-height: 44px; }
 
+.stepper.volume { margin-top: 14px; }
+.stepper.volume output { min-width: 3ch; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.remote-row.extras { grid-template-columns: repeat(3, 1fr); margin-top: 12px; }
+.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.type-row { display: flex; gap: 8px; margin-top: 12px; }
+.type-row input { flex: 1; min-width: 0; background: var(--surface-2); }
+.type-row .key { padding: 0 16px; }
+.apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.apps .chip { border-radius: 12px; min-height: 44px; }
+
 .inputs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
 .inputs:empty { display: none; }
 .chip {

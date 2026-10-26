@@ -6,6 +6,7 @@ const ROOT = 'tv_settings';
 
 // Settings people most often need back after an update. Shown on the home screen if the TV has them.
 const QUICK = [
+  'picture/picture_mode',
   'system/input_at_power_on',
   'system/cec/cec_function',
   'system/cec/one_touch_play',
@@ -20,11 +21,14 @@ const QUICK = [
 const KEYS = {
   SEEK_FWD: [2, 0], SEEK_BACK: [2, 1], PAUSE: [2, 2], PLAY: [2, 3],
   DOWN: [3, 0], LEFT: [3, 1], OK: [3, 2], RIGHT: [3, 7], UP: [3, 8],
-  BACK: [4, 0], SMARTCAST: [4, 3], CC_TOGGLE: [4, 4], INFO: [4, 6], MENU: [4, 8], HOME: [4, 15],
+  BACK: [4, 0], SMARTCAST: [4, 3], GUIDE: [4, 4], INFO: [4, 6], MENU: [4, 8], HOME: [4, 15],
   VOL_DOWN: [5, 0], VOL_UP: [5, 1], MUTE_TOGGLE: [5, 4],
   INPUT_NEXT: [7, 1], CH_DOWN: [8, 0], CH_UP: [8, 1], CH_PREV: [8, 2], EXIT: [9, 0],
   POW_OFF: [11, 0], POW_ON: [11, 1], POW_TOGGLE: [11, 2],
 };
+// Number keys are codeset 0, codes 0-9 (channel entry). Typed text is also codeset 0, but uses ASCII codes.
+for (let n = 0; n <= 9; n++) KEYS['NUM_' + n] = [0, n];
+const KEYLIST_CHUNK = 50;
 
 // Actions that reboot, wipe, or reset something get an extra confirmation.
 const DANGEROUS = new Set([
@@ -155,6 +159,10 @@ async function connect(ip) {
     const value = info.ITEMS && info.ITEMS[0] && info.ITEMS[0].VALUE;
     if (value && value.MODEL_NAME) tv.model = value.MODEL_NAME;
     if (value && value.CAST_NAME) tv.name = value.CAST_NAME;
+    // Chipset and firmware pick the right app launch IDs, e.g. "mtk5691-1.6.1670.1" -> "MT5691".
+    const os = value && value.BINARIES && value.BINARIES.ViziOS;
+    if (os) tv.chipset = os.split('-')[0].toUpperCase().replace(/^MTK/, 'MT');
+    if (value && value.SYSTEM_INFO && value.SYSTEM_INFO.VERSION) tv.firmware = value.SYSTEM_INFO.VERSION;
     saveTv();
     setStatus('connect-status', '');
     return afterConnect();
@@ -271,15 +279,147 @@ async function sendKey(name) {
   if (name === 'INPUT_NEXT' || name.startsWith('POW') || name === 'SMARTCAST') setTimeout(renderInputs, 1500);
 }
 
-let volTimer;
+// ---- Volume (exact level) -----------------------------------------------------------------------
+// Newer firmware has /audio/volume/level, which reads level + mute together and sets an exact level.
+
+let volTimer, volSendTimer, volMax = null, volSupported = true, volBusy = false;
+
+function showVolume(level, muted) {
+  $('vol-level').textContent = muted ? 'muted' : level;
+  $('vol-num').textContent = muted ? 'muted' : level;
+  if (!volBusy) $('vol-slider').value = level;
+}
+
+async function refreshVolume() {
+  try {
+    if (volSupported) {
+      const r = await request('GET', '/audio/volume/level');
+      const v = r.ITEM && r.ITEM.VALUE;
+      if (result(r) === 'SUCCESS' && v && Number.isFinite(v.LEVEL)) {
+        if (volMax == null) {
+          const s = await request('GET', `/menu_native/static/${ROOT}/audio/volume`).catch(() => null);
+          const max = s && s.ITEMS && s.ITEMS[0] && s.ITEMS[0].MAXIMUM;
+          volMax = Number.isFinite(max) ? max : 100;
+          $('vol-slider').max = volMax;
+        }
+        $('volume-row').hidden = false;
+        return showVolume(v.LEVEL, v.MUTE);
+      }
+      volSupported = false; // older firmware: fall back to the settings tree, no slider
+      $('volume-row').hidden = true;
+    }
+    const [vol, mute] = await Promise.all([getItem('audio/volume'), getItem('audio/mute')]);
+    $('vol-level').textContent = mute && mute.VALUE === 'On' ? 'muted' : (vol ? vol.VALUE : '');
+  } catch { /* keep the old number */ }
+}
+
 function scheduleVolumeRefresh() {
   clearTimeout(volTimer);
-  volTimer = setTimeout(async () => {
+  volTimer = setTimeout(refreshVolume, 350);
+}
+
+function setVolume(level) {
+  level = Math.max(0, Math.min(volMax || 100, Math.round(level)));
+  volBusy = true;
+  $('vol-slider').value = level;
+  $('vol-num').textContent = level;
+  clearTimeout(volSendTimer);
+  volSendTimer = setTimeout(async () => {
     try {
-      const [vol, mute] = await Promise.all([getItem('audio/volume'), getItem('audio/mute')]);
-      $('vol-level').textContent = mute && mute.VALUE === 'On' ? 'muted' : (vol ? vol.VALUE : '');
-    } catch { /* keep the old number */ }
-  }, 350);
+      const r = await request('PUT', '/audio/volume/level', { LEVEL: level });
+      if (result(r) !== 'SUCCESS') toast(`Couldn't set volume: ${detail(r)}`, true);
+    } catch {
+      toast(UNREACHABLE, true);
+    }
+    volBusy = false;
+    scheduleVolumeRefresh();
+  }, 250);
+}
+
+// ---- Screen off, typing, apps --------------------------------------------------------------------
+
+async function blankScreen() {
+  try {
+    const item = await getItem('system/timers/blank_screen');
+    const r = await request('PUT', `/menu_native/dynamic/${ROOT}/system/timers/blank_screen`, { REQUEST: 'ACTION', HASHVAL: item.HASHVAL });
+    if (result(r) === 'SUCCESS') toast('Screen off. Sound keeps playing; press any arrow to turn it back on.');
+    else toast(`Couldn't turn the screen off: ${detail(r)}`, true);
+  } catch (e) {
+    if (e instanceof NeedsPairing) return needPairing();
+    toast(UNREACHABLE, true);
+  }
+}
+
+// Each character is a codeset-0 key whose code is its ASCII value, sent in order.
+async function typeText(text) {
+  const codes = [...text].map(ch => ch.charCodeAt(0));
+  if (codes.some(c => c > 127)) return toast('Only plain letters, numbers and symbols (ASCII) can be typed.', true);
+  try {
+    for (let i = 0; i < codes.length; i += KEYLIST_CHUNK) {
+      const keys = codes.slice(i, i + KEYLIST_CHUNK).map(code => ({ CODESET: 0, CODE: code, ACTION: 'KEYPRESS' }));
+      const r = await request('PUT', '/key_command/', { KEYLIST: keys });
+      if (result(r) !== 'SUCCESS') return toast(`The TV didn't accept the text: ${detail(r)}`, true);
+    }
+    toast('Sent');
+    return true;
+  } catch {
+    toast(UNREACHABLE, true);
+  }
+}
+
+let appList = null;
+
+function versionAtLeast(version, min) {
+  if (!min) return true;
+  const a = String(version || '').split(/[.-]/).map(Number), b = String(min).split(/[.-]/).map(Number);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] || 0, y = b[i] || 0;
+    if (x !== y) return x > y;
+  }
+  return true;
+}
+
+// Pick the launch payload for this TV: its own chipset's entry first, then the generic "*" one.
+function launchPayload(app) {
+  for (const chip of [tv.chipset, '*']) {
+    for (const e of (chip && app.chipsets[chip]) || []) {
+      const fw = tv.firmware || '';
+      if (versionAtLeast(fw, e.min) && (!e.max || versionAtLeast(e.max, fw))) return e.payload;
+    }
+  }
+  return null;
+}
+
+async function renderApps() {
+  if (!appList) {
+    try { appList = await (await fetch('apps.json')).json(); } catch { return; }
+  }
+  let current = null;
+  try {
+    const r = await request('GET', '/app/current');
+    current = r.ITEM && r.ITEM.VALUE;
+  } catch { /* highlight is optional */ }
+  const apps = appList.map(app => ({ name: app.name, payload: launchPayload(app) })).filter(a => a.payload);
+  $('apps').replaceChildren(...apps.map(app => {
+    const isCurrent = current && current.NAME_SPACE === app.payload.NAME_SPACE && String(current.APP_ID) === String(app.payload.APP_ID);
+    const chip = el('button', 'chip' + (isCurrent ? ' selected' : ''), app.name);
+    chip.onclick = () => launchApp(app, chip);
+    return chip;
+  }));
+  $('apps-card').hidden = !apps.length;
+}
+
+async function launchApp(app, chip) {
+  for (const c of $('apps').children) c.classList.toggle('selected', c === chip);
+  try {
+    const { NAME_SPACE, APP_ID, MESSAGE } = app.payload;
+    const r = await request('PUT', '/app/launch', { VALUE: { NAME_SPACE, APP_ID, MESSAGE } }, { timeout: 10000 });
+    if (result(r) === 'SUCCESS') toast(`Opening ${app.name}`);
+    else toast(`Couldn't open ${app.name}: ${detail(r)}`, true);
+  } catch {
+    toast(UNREACHABLE, true);
+  }
+  setTimeout(() => { renderApps(); renderInputs(); }, 2500);
 }
 
 // Keys marked data-repeat keep firing while held, like a real remote.
@@ -512,17 +652,28 @@ async function runAction(item, button) {
 
 async function renderQuick() {
   const parents = [...new Set(QUICK.map(p => p.slice(0, p.lastIndexOf('/'))))];
+  // Some useful items (e.g. Picture Mode) are hidden in their menu, so the quick list fetches them directly.
+  const extras = {};
   const draw = menus => {
-    const byPath = {};
-    for (const item of menus.flat()) byPath[item.path] = item;
+    const byPath = { ...extras };
+    for (const item of menus.flat()) if (visible(item)) byPath[item.path] = item;
     const list = $('quick-list');
-    list.replaceChildren(...QUICK.filter(p => byPath[p] && visible(byPath[p])).map(p => renderItem(byPath[p], true)));
+    list.replaceChildren(...QUICK.filter(p => byPath[p]).map(p => renderItem(byPath[p], true)));
     $('quick').hidden = !list.children.length;
+    return QUICK.filter(p => !byPath[p]);
   };
   if (parents.every(p => menuCache[p])) draw(parents.map(p => menuCache[p]));
   // The top-level menu is loaded too, only for its names ("System" rather than "system") in the labels.
-  const menus = await Promise.all(['', ...parents].map(p => loadMenu(p).catch(e => { if (e instanceof NeedsPairing) throw e; return []; })));
-  draw(menus.slice(1));
+  const menus = (await Promise.all(['', ...parents].map(p => loadMenu(p).catch(e => { if (e instanceof NeedsPairing) throw e; return []; })))).slice(1);
+  const missing = draw(menus);
+  await Promise.all(missing.map(async path => {
+    const item = await getItem(path).catch(() => null);
+    if (item && item.CNAME && !SKIP_TYPES.has(item.TYPE)) {
+      const parent = path.slice(0, path.lastIndexOf('/'));
+      extras[path] = { ...item, parent, path };
+    }
+  }));
+  if (Object.keys(extras).length) draw(menus);
 }
 
 async function renderMenu(path) {
@@ -593,7 +744,7 @@ async function render({ keepScroll = false } = {}) {
       show('view-home');
       restore();
       scheduleVolumeRefresh();
-      await Promise.all([renderInputs(), renderQuick()]);
+      await Promise.all([renderInputs(), renderApps(), renderQuick()]);
     } else {
       setHeader(route.path ? menuLabel(route.path) : 'All settings', true);
       show('view-settings');
@@ -624,6 +775,21 @@ $('btn-pair-finish').onclick = pairFinish;
 $('pin').onkeydown = e => { if (e.key === 'Enter') pairFinish(); };
 $('btn-pair-cancel').onclick = pairCancel;
 $('btn-back').onclick = goBack;
+$('vol-slider').oninput = () => { volBusy = true; $('vol-num').textContent = $('vol-slider').value; };
+$('vol-slider').onchange = () => setVolume(Number($('vol-slider').value));
+$('vol-minus').onclick = () => setVolume(Number($('vol-slider').value) - 1);
+$('vol-plus').onclick = () => setVolume(Number($('vol-slider').value) + 1);
+$('btn-blank').onclick = blankScreen;
+$('btn-numpad').onclick = () => {
+  const open = $('numpad').hidden;
+  $('numpad').hidden = !open;
+  $('btn-numpad').setAttribute('aria-expanded', String(open));
+};
+$('type-form').onsubmit = async e => {
+  e.preventDefault();
+  const text = $('type-text').value;
+  if (text && await typeText(text)) $('type-text').value = '';
+};
 $('btn-forget').onclick = () => {
   if (!confirm('Forget this TV on this device? You will need to pair again.')) return;
   tv = { deviceId: tv.deviceId };
@@ -644,7 +810,7 @@ document.addEventListener('click', e => {
 window.addEventListener('popstate', () => render());
 window.addEventListener('scroll', rememberScroll, { passive: true });
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && ready && currentRoute().page === 'home') { renderInputs(); scheduleVolumeRefresh(); }
+  if (!document.hidden && ready && currentRoute().page === 'home') { renderInputs(); renderApps(); scheduleVolumeRefresh(); }
 });
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 history.replaceState({ depth: 0 }, '', location.hash || '#/');
