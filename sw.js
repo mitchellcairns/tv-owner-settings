@@ -1,5 +1,5 @@
 // Caches the app shell so the page opens offline. Requests to the TV are never intercepted.
-const CACHE = 'tv-owner-settings-v4';
+const CACHE = 'tv-owner-settings-v5';
 const SHELL = ['./', 'index.html', 'app.js', 'style.css', 'apps.json', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', event => {

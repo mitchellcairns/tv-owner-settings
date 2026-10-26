@@ -141,6 +141,9 @@ button:disabled, select:disabled, input:disabled { opacity: .45; cursor: not-all
 .media { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .media .key { min-height: 44px; }
 
+#scan-results { margin: 4px 0 8px; }
+.item.scan-hit { width: 100%; background: none; border: none; border-top: 1px solid var(--border); border-radius: 0; text-align: left; padding: 12px 0; }
+.list .item.scan-hit:first-child { border-top: none; }
 .stepper.volume { margin-top: 14px; }
 .stepper.volume output { min-width: 3ch; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 .remote-row.extras { grid-template-columns: repeat(3, 1fr); margin-top: 12px; }

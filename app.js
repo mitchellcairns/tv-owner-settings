@@ -142,6 +142,67 @@ async function getItem(path) {
   return r.ITEMS && r.ITEMS[0];
 }
 
+// ---- Finding the TV -----------------------------------------------------------------------------
+// Browsers can't do SSDP, and the TV's API port can't be probed before its certificate is trusted.
+// But SmartCast TVs also run Google Cast (plain HTTP on 8008) and AirPlay (plain HTTP on 7000).
+// With local network access allowed, a no-cors request that resolves means "something answered",
+// so a host answering on both ports is very likely a smart TV. Nothing is read from the devices.
+
+const SUBNETS = ['192.168.1', '192.168.0', '10.0.0', '192.168.86', '192.168.68', '10.0.1', '192.168.50', '192.168.2', '192.168.4', '10.1.10'];
+
+async function answers(url, ms) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    await fetch(url, { mode: 'no-cors', cache: 'no-store', signal: ctrl.signal, targetAddressSpace: 'local' });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+let scanning = false;
+async function scanForTvs() {
+  if (scanning) { scanning = false; return; } // second tap stops the scan
+  scanning = true;
+  $('btn-scan').textContent = 'Stop';
+  $('scan-results').replaceChildren();
+  const found = new Set();
+  const subnets = [...SUBNETS];
+  const known = tv.ip && tv.ip.split('.').slice(0, 3).join('.');
+  if (known) subnets.sort((a, b) => (b === known) - (a === known));
+
+  const addResult = async ip => {
+    const isTv = await answers(`http://${ip}:7000/info`, 1500);
+    const row = el('button', 'item scan-hit');
+    row.append(el('span', 'name', ip), el('span', 'value', isTv ? 'Likely a smart TV' : 'Cast device (speaker or display)'));
+    row.onclick = () => { scanning = false; $('ip').value = ip; connect(ip); };
+    if (isTv) $('scan-results').prepend(row); else $('scan-results').append(row);
+  };
+
+  for (const subnet of subnets) {
+    if (!scanning) break;
+    setStatus('scan-status', `Looking on ${subnet}.x… (tap Stop when your TV shows up)`);
+    const hosts = Array.from({ length: 254 }, (_, i) => `${subnet}.${i + 1}`);
+    for (let i = 0; i < hosts.length && scanning; i += 64) {
+      await Promise.all(hosts.slice(i, i + 64).map(async ip => {
+        if (await answers(`http://${ip}:8008/setup/eureka_info`, 1200) && !found.has(ip)) {
+          found.add(ip);
+          await addResult(ip);
+        }
+      }));
+    }
+    if (found.size) break; // devices are on this subnet; no need to try the others
+  }
+  scanning = false;
+  $('btn-scan').textContent = 'Find my TV';
+  if (found.size) setStatus('scan-status', 'Tap your TV to connect.');
+  else if ((await localNetworkState()) === 'denied') setStatus('scan-status', 'This browser is blocking access to your home network. Allow "Local network access" for this site, then try again.', 'error');
+  else setStatus('scan-status', "No TVs found. Make sure the TV is on, or enter its IP address below.", 'error');
+}
+
 // ---- Connect and trust ----------------------------------------------------------------------
 
 async function connect(ip) {
@@ -180,7 +241,7 @@ async function localNetworkState() {
   for (const name of ['local-network-access', 'local-network']) {
     try {
       const status = await navigator.permissions.query({ name });
-      status.onchange = () => { if (status.state === 'granted' && !ready) connect(tv.ip); };
+      status.onchange = () => { if (status.state === 'granted' && !ready && tv.ip && !scanning) connect(tv.ip); };
       return status.state;
     } catch { /* not this name, or not supported */ }
   }
@@ -809,6 +870,7 @@ $('btn-connect').onclick = () => {
 $('ip').onkeydown = e => { if (e.key === 'Enter') $('btn-connect').click(); };
 $('btn-retry').onclick = () => connect(tv.ip);
 $('btn-lna').onclick = requestLocalNetwork;
+$('btn-scan').onclick = scanForTvs;
 $('btn-copy-link').onclick = copyTrustLink;
 $('btn-change-ip').onclick = () => { $('ip').value = tv.ip || ''; show('view-connect'); };
 $('btn-pair-start').onclick = pairStart;
