@@ -29,10 +29,13 @@
     <section class="card" id="view-connect" hidden>
       <h2>Connect to your TV</h2>
       <p>Your TV must be on and on the same Wi-Fi network as this device.</p>
-      <label for="ip">TV IP address</label>
+      <button class="primary" id="btn-scan">Find my TV</button>
+      <p class="status" id="scan-status" role="status"></p>
+      <div class="list" id="scan-results"></div>
+      <label for="ip">Or enter the TV's IP address</label>
       <input id="ip" inputmode="decimal" autocomplete="off" placeholder="192.168.1.50">
       <p class="hint">Find it in your router's app (look for "Living Room TV" or similar), or on the TV under Network &rarr; Network Information.</p>
-      <button class="primary" id="btn-connect">Connect</button>
+      <button id="btn-connect">Connect</button>
       <p class="status" id="connect-status" role="status"></p>
     </section>
 
