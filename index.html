@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>TV Owner Settings</title>
+  <meta name="description" content="Unofficial settings app for Vizio SmartCast TVs. Pair with your TV and change its settings over your home network.">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img src="icon.svg" alt="" width="28" height="28">
+      <div>
+        <h1>TV Owner Settings</h1>
+        <p class="sub" id="tv-label">Not connected</p>
+      </div>
+    </div>
+    <button class="link" id="btn-forget" hidden>Forget TV</button>
+  </header>
+
+  <main>
+    <!-- Step 1: where is the TV -->
+    <section class="card" id="view-connect" hidden>
+      <h2>Connect to your TV</h2>
+      <p>Your TV must be on and on the same Wi-Fi network as this device.</p>
+      <label for="ip">TV IP address</label>
+      <input id="ip" inputmode="decimal" autocomplete="off" placeholder="192.168.1.50">
+      <p class="hint">Find it in your router's app (look for "Living Room TV" or similar), or on the TV under Network &rarr; Network Information.</p>
+      <button class="primary" id="btn-connect">Connect</button>
+      <p class="status" id="connect-status" role="status"></p>
+    </section>
+
+    <!-- Step 2: one-time certificate trust -->
+    <section class="card" id="view-trust" hidden>
+      <h2>Let this browser talk to your TV</h2>
+      <p>Your TV uses a security certificate that browsers don't recognize. You only need to approve it once:</p>
+      <ol>
+        <li>Tap <strong>Open TV link</strong>. A warning page opens in a new tab.</li>
+        <li>Choose <strong>Advanced</strong>, then <strong>Proceed</strong> (or <strong>Show Details &rarr; visit this website</strong> on iPhone).</li>
+        <li>You'll land on a plain page that says <strong>Unhandled Exception</strong>. That's normal: it means the TV answered. Close that tab and tap <strong>Retry</strong> here.</li>
+      </ol>
+      <div class="row">
+        <a class="button primary" id="trust-link" target="_blank" rel="noopener">Open TV link</a>
+        <button id="btn-retry">Retry</button>
+      </div>
+      <p class="hint">If your browser asks to <em>access devices on your local network</em>, choose Allow.</p>
+      <button class="link" id="btn-change-ip">Use a different IP address</button>
+      <p class="status" id="trust-status" role="status"></p>
+    </section>
+
+    <!-- Step 3: pairing -->
+    <section class="card" id="view-pair" hidden>
+      <h2>Pair with your TV</h2>
+      <p>Tap <strong>Show PIN on TV</strong>. A 4-digit PIN appears on your TV screen. Type it below.</p>
+      <button class="primary" id="btn-pair-start">Show PIN on TV</button>
+      <div id="pin-box" hidden>
+        <label for="pin">PIN shown on TV</label>
+        <input id="pin" inputmode="numeric" maxlength="4" autocomplete="one-time-code" placeholder="0000">
+        <div class="row">
+          <button class="primary" id="btn-pair-finish">Pair</button>
+          <button id="btn-pair-cancel">Cancel</button>
+        </div>
+      </div>
+      <p class="status" id="pair-status" role="status"></p>
+    </section>
+
+    <!-- Step 4: settings -->
+    <section id="view-settings" hidden>
+      <div id="quick" class="card">
+        <h2>Common fixes</h2>
+        <div id="quick-list" class="list"></div>
+      </div>
+      <div class="card">
+        <nav class="crumbs" id="crumbs" aria-label="Settings path"></nav>
+        <p class="warn" id="menu-warn" hidden></p>
+        <div id="menu-list" class="list"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <footer>
+    Unofficial. Not affiliated with or endorsed by VIZIO. This page talks only to your TV on your home network;
+    your pairing key stays in this browser.
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
