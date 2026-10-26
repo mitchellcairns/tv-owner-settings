@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>TV Owner Settings</title>
-  <meta name="description" content="Unofficial settings app for Vizio SmartCast TVs. Pair with your TV and change its settings over your home network.">
+  <meta name="description" content="Unofficial remote and settings app for Vizio SmartCast TVs. Pair with your TV and control it over your home network.">
   <meta name="theme-color" content="#0f172a">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -13,12 +13,13 @@
 </head>
 <body>
   <header class="top">
-    <div class="brand">
-      <img src="icon.svg" alt="" width="28" height="28">
-      <div>
-        <h1>TV Owner Settings</h1>
-        <p class="sub" id="tv-label">Not connected</p>
-      </div>
+    <button class="icon-btn" id="btn-back" aria-label="Back" hidden>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <img class="logo" id="logo" src="icon.svg" alt="" width="30" height="30">
+    <div class="titles">
+      <h1 id="page-title">TV Owner Settings</h1>
+      <p class="sub" id="tv-label">Not connected</p>
     </div>
     <button class="link" id="btn-forget" hidden>Forget TV</button>
   </header>
@@ -69,14 +70,73 @@
       <p class="status" id="pair-status" role="status"></p>
     </section>
 
-    <!-- Step 4: settings -->
-    <section id="view-settings" hidden>
-      <div id="quick" class="card">
+    <!-- Home: remote + shortcuts -->
+    <section id="view-home" hidden>
+      <div class="card remote" aria-label="Remote control">
+        <div class="remote-top">
+          <button class="key power" data-key="POW_TOGGLE" aria-label="Power">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8M6.3 6.8a8 8 0 1 0 11.4 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          </button>
+          <button class="key" data-key="INPUT_NEXT">Input</button>
+          <button class="key" data-key="SMARTCAST">Home</button>
+          <button class="key" data-key="MUTE_TOGGLE" aria-label="Mute">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 9l5 6M21 9l-5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+
+        <div class="dpad">
+          <button class="key up" data-key="UP" data-repeat aria-label="Up">&#9650;</button>
+          <button class="key left" data-key="LEFT" data-repeat aria-label="Left">&#9664;</button>
+          <button class="key ok" data-key="OK">OK</button>
+          <button class="key right" data-key="RIGHT" data-repeat aria-label="Right">&#9654;</button>
+          <button class="key down" data-key="DOWN" data-repeat aria-label="Down">&#9660;</button>
+        </div>
+
+        <div class="remote-row">
+          <button class="key" data-key="BACK">Back</button>
+          <button class="key" data-key="MENU">Menu</button>
+          <button class="key" data-key="INFO">Info</button>
+          <button class="key" data-key="EXIT">Exit</button>
+        </div>
+
+        <div class="rockers">
+          <div class="rocker">
+            <button class="key" data-key="VOL_UP" data-repeat aria-label="Volume up">+</button>
+            <span class="rocker-label">Vol <output id="vol-level"></output></span>
+            <button class="key" data-key="VOL_DOWN" data-repeat aria-label="Volume down">&minus;</button>
+          </div>
+          <div class="media">
+            <button class="key" data-key="SEEK_BACK" aria-label="Rewind">&#9194;</button>
+            <button class="key" data-key="PLAY" aria-label="Play">&#9654;</button>
+            <button class="key" data-key="PAUSE" aria-label="Pause">&#10074;&#10074;</button>
+            <button class="key" data-key="SEEK_FWD" aria-label="Fast forward">&#9193;</button>
+          </div>
+          <div class="rocker">
+            <button class="key" data-key="CH_UP" data-repeat aria-label="Channel up">+</button>
+            <span class="rocker-label">Ch</span>
+            <button class="key" data-key="CH_DOWN" data-repeat aria-label="Channel down">&minus;</button>
+          </div>
+        </div>
+
+        <div class="inputs" id="inputs" aria-label="Inputs"></div>
+      </div>
+
+      <div class="card" id="quick">
         <h2>Common fixes</h2>
         <div id="quick-list" class="list"></div>
       </div>
+
       <div class="card">
-        <nav class="crumbs" id="crumbs" aria-label="Settings path"></nav>
+        <a class="item menu" href="#/settings">
+          <span class="name">All settings</span>
+          <span class="chev" aria-hidden="true">&rsaquo;</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- Settings menus -->
+    <section id="view-settings" hidden>
+      <div class="card">
         <p class="warn" id="menu-warn" hidden></p>
         <div id="menu-list" class="list"></div>
       </div>
