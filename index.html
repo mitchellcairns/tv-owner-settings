@@ -118,7 +118,45 @@
           </div>
         </div>
 
+        <div class="stepper volume" id="volume-row" hidden>
+          <button id="vol-minus" aria-label="Volume down one step">&minus;</button>
+          <input type="range" id="vol-slider" min="0" max="100" step="1" aria-label="Volume">
+          <button id="vol-plus" aria-label="Volume up one step">+</button>
+          <output id="vol-num" aria-live="polite"></output>
+        </div>
+
+        <div class="remote-row extras">
+          <button class="key" id="btn-numpad" aria-expanded="false" aria-controls="numpad">123</button>
+          <button class="key" data-key="GUIDE">Guide</button>
+          <button class="key" id="btn-blank" title="Turns the picture off; sound keeps playing. Any arrow key turns it back on.">Screen off</button>
+        </div>
+
+        <div class="numpad" id="numpad" hidden>
+          <button class="key" data-key="NUM_1">1</button>
+          <button class="key" data-key="NUM_2">2</button>
+          <button class="key" data-key="NUM_3">3</button>
+          <button class="key" data-key="NUM_4">4</button>
+          <button class="key" data-key="NUM_5">5</button>
+          <button class="key" data-key="NUM_6">6</button>
+          <button class="key" data-key="NUM_7">7</button>
+          <button class="key" data-key="NUM_8">8</button>
+          <button class="key" data-key="NUM_9">9</button>
+          <button class="key" data-key="CH_PREV">Prev</button>
+          <button class="key" data-key="NUM_0">0</button>
+          <button class="key" data-key="OK">Enter</button>
+        </div>
+
+        <form class="type-row" id="type-form" autocomplete="off">
+          <input id="type-text" placeholder="Type into a search box on the TV" aria-label="Text to type on the TV" enterkeyhint="send">
+          <button class="key" type="submit">Send</button>
+        </form>
+
         <div class="inputs" id="inputs" aria-label="Inputs"></div>
+      </div>
+
+      <div class="card" id="apps-card" hidden>
+        <h2>Apps</h2>
+        <div class="apps" id="apps"></div>
       </div>
 
       <div class="card" id="quick">
