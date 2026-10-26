@@ -1,0 +1,5 @@
+# Pairing token for your own TV; never commit it
+.vizio_auth.json
+settings-dump.json
+dump-log.txt
+__pycache__/
