@@ -1,5 +1,5 @@
 // Caches the app shell so the page opens offline. Requests to the TV are never intercepted.
-const CACHE = 'tv-owner-settings-v1';
+const CACHE = 'tv-owner-settings-v2';
 const SHELL = ['./', 'index.html', 'app.js', 'style.css', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', event => {
@@ -17,9 +17,10 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
-  // Network first so updates show up right away; fall back to the cache when offline.
+  // Network first, revalidating past the HTTP cache, so updates show up right away; cache only when offline.
+  const fresh = event.request.mode === 'navigate' ? fetch(event.request) : fetch(event.request.url, { cache: 'no-cache' });
   event.respondWith(
-    fetch(event.request)
+    fresh
       .then(res => {
         const copy = res.clone();
         caches.open(CACHE).then(cache => cache.put(event.request, copy));
